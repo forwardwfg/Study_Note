@@ -26,6 +26,14 @@ git push -u origin master
 
 
 
+## 从远程仓库获取最新版本的代码
+
+获取最新版本有两种方法，拉取和获取pull和fetch
+
+* git pull 从远程拉取最新版本到本地，自动合并merge， git pull origin master
+
+* git  fetch  从远程获取最新版本 到本地  不会自动合并 merge   git fetch  origin master  
+
 ## Error
 
 **git fatal: 远程 origin 已经存在**
