@@ -2,6 +2,8 @@
 
 1.命令创建一个空的Git仓库或重新初始化一个现有仓库
 
+<<<<<<< HEAD
+
 ```
 git init
 ```
@@ -11,9 +13,6 @@ git init
 ```
 git add 文件名
 ```
-
-ps git add. 可以添加所有
-
 3.添加注释
 
 ```
@@ -25,11 +24,9 @@ git commit -m "注释"
 ```
 git remote add origin https://github.com/用户名/xxxx.git
 ```
-
 ps 在默认情况下，origin指向的就是你本地的代码库托管在Github上的版本。origin就是一个名字，它是在你clone一个托管在Github上代码库时，git为你默认创建的指向这个远程代码库的标签。
 
 5.提交到origin的主分支
-
 首次提交到master
 
 ```
@@ -44,7 +41,13 @@ git push origin master
 
 
 
+## 从远程仓库获取最新版本的代码
 
+获取最新版本有两种方法，拉取和获取pull和fetch
+
+* git pull 从远程拉取最新版本到本地，自动合并merge， git pull origin master
+
+* git  fetch  从远程获取最新版本 到本地  不会自动合并 merge   git fetch  origin master  
 
 
 
@@ -150,14 +153,15 @@ Changes not staged for commit:
 git pull origin master --allow-unrelated-histories
 ```
 
-
-
 **Automatic merge failed; fix conflicts and then commit the result.**
 
 clone了远程的代码，然后做了修改了代码，
 
-
-
 **git push 出现Everything up-to-date**:
 
 错误原因：可能是没有git add和git commit，重新add 和commit即可。
+
+git push -u origin master
+
+
+
