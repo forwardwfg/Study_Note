@@ -1,3 +1,13 @@
+## 简介
+
+Git是一种分布式版本管理系统。
+
+什么是版本管理？例如对于策划某个活动，老板可能让你修改很多遍，如果你只是在同一份文档上修改的话，最后老板说：“嗯！还是用回第一次那份策划把”，这是你可能会崩溃了，因为这意味这你又要把那份文档改回第一个版本。但是如果你的每次修改的文档都做一个备份，plan1.doc，plan2.doc等等，你就可以很方便地第一个版本的文档扔到老板面前了。其实后面对每个修改了的文档都做备份，形成不同的版本，这就是版本管理。
+
+什么是分布式？“分布式"相对于"集中式"而分布式而言。把所有数据保存在服务器上节点上，所有客户节点都从服务节点上获取数据的版本控制称为集中式版本管理。因为你的数据不仅仅保存在Git的服务器上，还会保存在自己本地，所以Git称为分布式版本管理系统。
+
+
+
 ## 上传本地文件
 
 1.命令创建一个空的Git仓库或重新初始化一个现有仓库
@@ -127,12 +137,6 @@ git commit -m “merge conflict”
 git push origin master
 ```
 
-
-
-
-
-
-
 **git status 后，出现**：
 
 ```On branch master
@@ -143,7 +147,7 @@ Changes not staged for commit:
 
 **git pull origin master，fatal: refusing to merge unrelated histories**
 
-错误原因：
+错误原因：git认为本地和远程仓库没有是两个独立的仓库，他们之间没有联系。在github网页下载下来的仓库会遇到这种问题，但是通过命令git clone则不会。
 
 在 git pull origin master 添加 --allow-unrelated-histories，即
 
@@ -151,15 +155,67 @@ Changes not staged for commit:
 git pull origin master --allow-unrelated-histories
 ```
 
-**Automatic merge failed; fix conflicts and then commit the result.**
+合并后，还需要提交结果才能使得本地和远程仓库同步。
 
-clone了远程的代码，然后做了修改了代码，
+```
+git add .
+git push origin master
+```
 
-**git push 出现Everything up-to-date**:
+**git push后，Everything up-to-date**:
 
 错误原因：可能是没有git add和git commit，重新add 和commit即可。
 
-git push -u origin master
+## Git的三个分区
 
+Git的三个分区分别是工作目录，Index索引区，版本库。
 
+* 工作目录：操作系统上的文件，所有代码开发编辑都在这上面完成。
+* 索引区(缓存区)：暂时存放数据的区域
+* 版本库：存放commit后的数据，push时候，就会把这个区域的数据push到远程仓库了。
 
+<img src="https://gitee.com/weifagan/MyPic/raw/master/img/.git5.png" style="zoom:80%;" />
+
+刚开始三个分区都一样，没区别。当在工作区修改数据时候，工作区内容发生改变，但暂存区和版本库内容不变。当执行git add之后，修改被同步到缓存区，这时候工作区和缓存区保持内容一样了。执行git commit后，三个区域内容保持一致。push后，数据推送到远程仓库。
+
+三个分区对比命令：
+
+```
+git diff	            工作区 vs 暂存区
+git diff head	        工作区 vs 版本库
+git diff –cached        暂存区 vs 版本库
+```
+
+## Git存储方式
+
+当在一个新目录下或者已有目录内执行进行git init，就会创建一个.git目录，几乎所有存储和操作的内容都位于该目录下。.git目录如下图
+
+<img src="https://gitee.com/weifagan/MyPic/raw/master/img/.git1.png" style="zoom:67%;" />
+
+* config文件包含了项目的配置选项
+
+* objects目录存储所有数据内容
+
+* HEAD文件指向当前分支
+
+* index文件保存了暂存区信息
+
+* refs目录存储 指向数据的提交对象的指针
+* hooks 目录保存了客户端或服务端钩子脚本
+* info 目录保存了一份不希望在 .gitignore 文件中管理的忽略模式 (ignored patterns) 的全局可执行文件
+
+其中，HEAD 及 index 文件，objects 及 refs 目录是 Git 的核心部分。
+
+objects目录存储了所有的数据，该目录下的每一份文件都是Git为每份存储数据生成一个文件，如下图。
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/.git2.png)
+
+文件夹下存放的文件如下图所示，它是一个二进制文件。
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/.git4.png)
+
+objects存储目录中的二进制文件对象类型有三种，blob，tree和commit。
+
+* blob，用于存储数据内容，不包括文件名等其他信息。
+* tree，用于存储目录结构。
+* commit，用于存储提交的信息。
