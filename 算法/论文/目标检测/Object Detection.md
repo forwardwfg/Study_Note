@@ -152,9 +152,76 @@ ${Pos}^{B}$没有算上GT位置的8邻域，因为feature map的size比较小。
 
 * 1920 x 1080 ：37 FPS
 
-## 对我们的指导意义？
+## 4 对我们的指导意义？
 
 FootAndBall 主要使用全卷机网络对目标进行预测，并结合FPN的思想。
 
 * 对于小物体检测，考虑FPN
 * 可以使用全卷积在feature map上做预测。
+
+
+
+# Objects as Points
+
+## 1.论文要解决什么问题？
+
+目标检测将图像的目标识别为轴对称的boxes，很多目标检测器几乎会列出的潜在对象位置，并对每个位置分类，这是很浪费时间，没有效率和需要额外的后处理。因此，作者提供一个更简单有效的方案，将目标建模为一个点-边框中心点，使用关键点估计寻找中心点和回归其他对象属性。例如大小，3D位置，方向甚至是姿态。
+
+## 2.所提算法如何解决问题？
+
+文中作者提供了一个更简单更高效选择。作者将一个对象表示为边框中心的一个点，其他性能，例如对象大小，维度，3D扩展，方向和姿态等则可以**从图像特征的中心位置直接回归**。这样子的话目标检测变成一个是标准的关键点检测问题。作者简单地把输入图像喂入全卷基层然后产生一个heatmap。在这张heatmap中的峰值对应对象的中心。在每个峰值的图像特征预测对象边框的高和宽。模型使用标准的监督学习训练。推理是单个网络的前向传播，没有nms的后处理。
+
+总结一下这个过程：输入图片->全卷积->heatmap(峰值)->预测宽高
+
+### 2.1 初步
+
+输入图像$I \in R^{W\times H \times 3}$，目标是产生一个关键点heatmap$\hat{Y}\in[0,1]^{\frac{W}{R}\times \frac{H}{R} \times C}$，$R$为输入步长，$C$是关键点类型的数量。姿态估计中$C=17$，目标检测中$C=80$。$\hat{Y}_{x,y,c}=1$对应检测的关键点，$\hat{Y}_{x,y,c}=0$则为背景。作者使用几个不同的全卷积编码解码网络从$I$来预测$\hat{Y}$:**hourglass,ResNet,DLA。**
+
+对于每个类别$c$的GT关键点$p$，计算它的低分辨率$\overline{p}=\lfloor \frac{p}{R} \rfloor$，然后将GT所有点的映射到hearmap中$Y=\in[0,1]^{\frac{W}{R}\times\frac{h}{R}\times c}$。作者通过使用高斯核$Y_{xyc}=exp(*)$把所有gt关键点映射到heatmap $Y\in[0,1]^{\frac{W}{R}\times \frac{W}{R} \times C}$，如果同一个类的高斯是重叠的，则选择像素最大那个。
+
+训练目标是采用的Focal Loss的像素回归:
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/CenterNet loss.png)
+
+为了弥补由输出步长导致的离散化误差，额外预测局部偏移。所有类别$c$共享一个偏移预测。
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/CenterNet loss off.png)
+
+### 2.2 把目标作为一个点
+
+$(x^{(k)}_1,y^{(k)}_1,x^{(k)}_2,y^{(k)}_2)$为类别$c_k$的对象$k$的边框，它的中心点位于$(\frac{x^{(k)}_1+y^{(k)}_1}{2},(\frac{x^{(k)}_1+y^{(k)}_1}{2})$。作者用关键点估计器$\hat{Y}$来预测所有中心点。此外，还回归每个对象$k$的大小$s_k$。为了限制计算负担，对所有目标仅仅使用一个单尺寸预测$\hat{S}$。
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/CenterNet loss size.png)
+
+总的目标函数：
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/CenterNet loss det.png)
+
+对于每个位置，网络预测一共$C+4$输出。所有输出共享一个共同的全卷积backbone网络。对于每个模态，主干的特征通过3×3卷积、ReLU卷积和另一个1×1卷积
+
+**From points to bounding boxes**:推理时候，首先单独地给每个类别提取heatmap的峰值，作者检测所有大于等于它周围8个邻域的值响应并保持top100个峰值。作者使用关键点的值$\hat{Y}_{x_iy_ic}$作为它的检测自信度并产生边框：
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/CenterNet box.png)
+
+所有输出直接从关键点估计产生，不需要NMS或者其他后处理。峰值关键点提取看作是充足NMS替代方案并可以使用一个3x3的maxpool操作有效实现。
+
+
+
+## 3 实验结果
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/ap12.PNG)
+
+CenterNet with Hourglass-104 achieves an AP of 45:1%, outperforming all existing
+one-stage detectors。
+
+## 4 总结
+
+CenterNet把对象看做一个中心点。首先在全卷积网络上产生一个heatmap，然后heatmap上会有预测出来的中心点(峰值)，其他性能如大小维度等也可以从中心位置的图像特征进行回归。当然原图GT的坐标也要通过步长和高斯核映射到heatmap，这样子才能产生loss。
+
+
+
+## 5 指导意义
+
+* 把对象建模成一个中心点并在目标检测转换为关键点估计
+* centernet网络
+
