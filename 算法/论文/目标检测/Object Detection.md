@@ -94,17 +94,67 @@ $$
 
 ### 2.2 FootAndBall
 
-FootAndBall输入：1920x1080
+### 2.2.1 输入输出
 
-FootAndBall主要 产生是三个输出:
+**FootAndBall输入**：1920x1080
+
+**FootAndBall主要有三个输出:**
 
 * ball confidence map(对足球出现在某个格子的概率进行编码)
 * player confidence map(对运动员出现在某个格子概率进行编码)
 * player bounding boxes tensor(对运动员bounding boxes进行编码)
 
+### 2.2.2 网络结构
+
 FootAndBall使用了**FPN**(feature pyramid network，特征金字塔网络)思路，结合低级特征和高级特征，改善大背景下的小目标的检测。网络框架如图4所示。
 
 <img src="https://gitee.com/weifagan/MyPic/raw/master/img/footandball.PNG" style="zoom: 80%;" />
 
+由图4可知，较高层的卷积块上采样后与经过1x1卷积较低层的特征进行相加，输出三个head。其中Ball confidence map在比较浅的层输出，因为球比较小，也不需要太大的感受野。
+
+由图4可知，input image宽和高分别是w,h，Ball confidence map的大小为(w/4,h/4,1)。Ball confidence map的位置$(i,j)$对应回原图$(x,y)=(\lfloor k(i-0.5),k(j-0.5) \rfloor$)，其中$k=4$。Player confidence map同理。
+
+Player bounding boxes 编码为$(x_{bbx},y_{bbx},w_{bbx},h_{bbx})$。其中$(x_{bbx},y_{bbx})$为confidence map上对应grid ceil中点的相对位置，而$w_{bbx},h_{bbx}$为bbxes在confidence map上的宽高。
+
+现在设置Player confidence map输出坐标为$(i,j)$，即预测出player坐标为$(i,j)$，则bounding box中心在原图上的坐标为$(x'_{bbx},y'_{bbx})=(\lfloor k(i-0.5)+x_{bbx}w \rfloor,\lfloor k(j-0.5)+y_{bbx}h \rfloor)$，其实player的预测坐标加上预测的偏移量。
 
 
+
+### 2.2.3 损失函数
+
+损失函数主要三个成分：ball classification loss, player classification loss and player bounding box loss。计算这三个成分都是使用二值交叉熵函数。
+
+**ball classification loss**:
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/footandball1.PNG)
+
+其中，$c_{ij}^{B}$是ball confidence map上$(i,j)$位置上的值，${Pos}^{B}$是ball confidence map上GT的位置集合(GT位置的8邻域也要算上该集合)。${Neg}^B$是负样例集合，是ball confidence map上没有GT的位置集合。
+
+**player classification loss**：
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/footandball2.PNG)
+
+${Pos}^{B}$没有算上GT位置的8邻域，因为feature map的size比较小。
+
+**player bounding box loss**:
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/footandball3.PNG)
+
+其中$I_{(i,j) \in R^4}$是featue map位置$(i,j)$上预测的bounding box，而$ g_{(i,j)}$ 是对应的GT。
+
+**loss**：
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/footandball4.PNG)
+
+因为正样例和负样例数量不平衡，所以要限制一下，正负比例最多1:3。
+
+## 3 实验结果如何？
+
+* 1920 x 1080 ：37 FPS
+
+## 对我们的指导意义？
+
+FootAndBall 主要使用全卷机网络对目标进行预测，并结合FPN的思想。
+
+* 对于小物体检测，考虑FPN
+* 可以使用全卷积在feature map上做预测。
