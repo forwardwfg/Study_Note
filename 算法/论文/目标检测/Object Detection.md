@@ -197,7 +197,7 @@ $(x^{(k)}_1,y^{(k)}_1,x^{(k)}_2,y^{(k)}_2)$为类别$c_k$的对象$k$的边框�
 
 ![](https://gitee.com/weifagan/MyPic/raw/master/img/CenterNet loss det.png)
 
-对于每个位置，网络预测一共$C+4$输出。所有输出共享一个共同的全卷积backbone网络。对于每个模态，主干的特征通过3×3卷积、ReLU卷积和另一个1×1卷积
+对于每个位置，网络预测一共$C+4$输出(关键点+offset+size)。所有输出共享一个共同的全卷积backbone网络。对于每个模态，主干的特征通过3×3卷积、ReLU卷积和另一个1×1卷积。
 
 **From points to bounding boxes**:推理时候，首先单独地给每个类别提取heatmap的峰值，作者检测所有大于等于它周围8个邻域的值响应并保持top100个峰值。作者使用关键点的值$\hat{Y}_{x_iy_ic}$作为它的检测自信度并产生边框：
 
@@ -225,3 +225,17 @@ CenterNet把对象看做一个中心点。首先在全卷积网络上产生一�
 * 把对象建模成一个中心点并在目标检测转换为关键点估计
 * centernet网络
 
+# Receptive Field Block Net for Accurate and Fast Object Detection
+## 1.论文主要解决什么问题？
+
+现有的主流目标检测器的套路：
+
+1.依靠强有力的主干网络来提取特征(ResNet-101、Inception)，但是开销大，速度慢。
+
+2.使用轻量级的主干网络(如mobilenet)，虽然速度快，但是精度较弱。
+
+作者受到人类视觉系统感觉结构的启发，考虑感受野的大小和偏心率，提出了RFB模块来增加特征判别性和鲁棒性。
+
+## 2. 所提算法如何解决问题？
+
+## 2.1 

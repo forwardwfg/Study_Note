@@ -29,6 +29,7 @@ gcc -S test.i -o test.s
 -S的选项，可以让编译器在生成汇编代码后停止，并输出结果
 
 4. 汇编
+5. 
 
 ```
 gcc -c  test.s -o test.o
