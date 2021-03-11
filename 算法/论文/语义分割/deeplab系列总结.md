@@ -142,7 +142,7 @@ Multi-grid = [r1,r2,r3]，Block4-Block6中有各自的unit rates，Block中的ra
 
 * 将encoder的结果进行4倍上采样，然后与resnet下采样前的conv2特征concat，再进行3x3卷积，然后在4倍上采样
 
-* 融合低层次信息前，先进行1x1的卷积，目的是降通道（例如有512个通道，而encoder结果只有256个通道） 
+* z
 =======
 # Deeplab v1总结
 
