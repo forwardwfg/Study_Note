@@ -239,3 +239,136 @@ CenterNet把对象看做一个中心点。首先在全卷积网络上产生一�
 ## 2. 所提算法如何解决问题？
 
 ## 2.1 
+
+
+
+# Focal Loss for Dense Object Detection
+
+## 1.论文要解决什么问题？
+
+two-stage-detector可以达到很高的准确度，但是速度慢，two-stage-detector速度快，但是准确度较低，作者提出focal loss是想one-stage-detector也能达到two-stage-detector的准确度。
+
+
+
+## 2.所提算法如何解决问题？
+
+作者认为one-stage-detector的准确度不如two-stage-detector是由于样本的类别不均衡导致的。目标检测，一张图片可以有很多候选框，但是只有很少部分包含检测对象，这会带来类别不平衡。这种负样本太多导致占loss的大部分，而且多是容易分类的。
+
+OHEM的思想虽然也是处理样本不平衡的问题，但是忽略了容易分类的样本。
+
+因此针对类别不均衡问题，作者提出一种新的损失函数：focal loss，这个损失函数是在标准交叉熵损失基础上修改得到的。**这个函数可以通过减少易分类样本的权重，使得模型在训练时更专注于难分类的样本。**为了证明focal loss的有效性，作者设计了一个dense detector：RetinaNet，并且在训练时采用focal loss训练。**实验证明RetinaNet不仅可以达到one-stage detector的速度，也能有two-stage detector的准确率。**
+
+
+
+## 2.1交叉熵
+
+先看二分类的交叉熵。
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/focalloss.jpg)
+
+其中p表示正样本的预测概率。如果p=0.9，那么-log(p)固然也很小。
+
+用pt替代p
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/focalloss1.jpg)
+
+那么公式(1)可以写成
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/focalloss.PNG)
+
+## 2.2 交叉熵改进
+
+目标检测训练时候正负样本差距比较大，通常给正负样本加上权重，因为负样本数量多，所以给予的权重小一些，正样本数量小，所以给予的权重大一些。因此可以通过$\alpha_t$的值来调整正负样本对loss的共享权重。
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/focalloss3.PNG)
+
+虽然公式(3)可以控制正负样本的权重，但是没办法控制容易分类和难分类的权重。于是有了focal loss
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/focalloss4.PNG)
+
+$\gamma$称为focusing parameter，${(1-p_t)}^{\gamma}$称为调制系数，目的在于减少易分类样本的权重，使得模型更加专注于难分类样本的样本。
+
+**Focal Loss 两个重要性质**
+
+1.当一个正样本被分错类时，pt很小，那么调制因子(1-pt)接近1，损失不太收到影响，当pt接近1时候，1-pt很小，就是容易分类的样本的权重被给予很小的值。
+
+2.当$\gamma=0$的时候，focal loss就是传统的交叉熵，$\gamma$能够使得难分类样本的权重，增加那些误分类的重要性。例如，当$\gamma$为2时，pt=0.9的loss要比标准的交叉熵小100+倍，当pt=0.968时，要小1000+陪。对于hard example 权重相对提升很多。
+
+结合公式(3)，得到公式(5)，这样子既能调整正负样本的权重，又能控制难易分类样本的权重。
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/focalloss6.PNG)
+
+为了验证focal loss，作者提出RetinaNet(本质上就是resnet+fpn+fcn)，使用两个子网络来分别预测classes和box。
+
+<img src="https://gitee.com/weifagan/MyPic/raw/master/img/RetinaNet.PNG" style="zoom:80%;" />
+
+## 3.实验结果如何
+
+$\gamma$=2，$\alpha$=0.25时，效果最好，结果SOTA.
+
+<img src="https://gitee.com/weifagan/MyPic/raw/master/img/focallloss_res.PNG" style="zoom:80%;" />
+
+## 4.思考
+
+1.为什么二阶段的检测器可以避免类别不平衡问题？
+
+因为二阶段检测器有RPN罩着。第一阶段的RPN对anchor进行简单分类(区分前景还是背景)，经过筛选，属于背景的bbx被大量削减，虽然其数量依然远大于前景类bbox，但是至少数量差距已经不像最初生成的anchor那样夸张了。就等于是 从 “**类别 极 不平衡**” 变成了 “**类别 较 不平衡**”
+
+2.为什么一阶段检测器难以避免类别不平衡的问题？
+
+因为one stage系的detector直接在首波生成的“类别极不平衡”的bbox中就进行难度极大的细分类，意图直接输出bbox和标签（分类结果）。而原有交叉熵作为分类任务的损失函数，无法抗衡“类别极不平衡”，容易导致分类器训练失败。因此，one-stage detector虽然保住了检测速度，却丧失了检测精度。
+
+3.正负样本和难易分类样本有什么关系？
+
+首先样本的不平衡可能会存在于正负样本，难易样本，类别间样本。Focal loss主要是解决难易样本不平衡的问题。
+
+* 正样本：标签区域内的图像区域。
+
+* 负样本：标签以外的图像区域，即图像背景区域。
+* 易分类样本(容易识别正确的样本)：样本数量多，累计loss大，那么在训练过程中，loss的降低很大程度来源于这种数量多的样本，使得模型更加专注于学习这种样本，导致了它是易分类的样本。那么负样本通常来说是易分类的样本，那存在负样本也是难分类样本吗？就是这种负样本很容易识别成正样本是否存在？例如？可能存在背景跟前景很相似，使得它是难分类样本。譬如说背景有一个假人，那么这个负样本可能就是难分类样本。
+
+* 难分类样本(难以识别正确的样本)：样本数量小，累计loss小，使得模型难以学习这种样本。
+
+# SWA Object Detection
+
+## 1.解决什么问题？
+
+作者提出了一个有用的trick，不用增加推理耗时也不用改变检测器，就可以在COCO上提升1%AP。**方法是：使用周期学习率来额外训练检测器12个epoch，然后平均这些checkpoints作为最后的模型。**
+
+作者提出的trick是受到SWA( Stochastic Weights Averaging，一种提高泛化能力的方法)的启发，发现SWA用在目标检测非常有用。
+
+## 2.Trick为何有用？
+
+### 2.1 SWA
+
+简单来说，SWA就是在带有高恒定学习率或者周期性学习率的SGD的优化轨迹上平均多个checkpoints的方法，提升泛化能力。为啥简单的SWA有用？记第$i$个epoch的checkpoint为$w_i$，一般情况下，我们会使用最后epoch的模型$w_n$或者在验证集上效果最好的模型$w_i^*$作为最终的模型。但是SWA是平均多个模型$w=\frac{1}{n-m+1}\sum_{i=m}^n{w_i}$作为最终的模型。
+
+SWA的具体做法如下图所示，前75%的时间使用标准的衰减学习速率策略训练，然后剩余25%设置一个合理的固定学习速率进行训练，最后平均第二阶段每个epoch的weights。如下图b所示，也可以采用在每个epoch采用周期式的学习速率策略来训练。另外一点是模型中如果有BN层，那么应该用SWA得到的模型在训练数据中跑一遍得到BN层的running statistics。
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/swa2.PNG)
+
+那么SWA为什么有效呢，论文也给了简单的解释，由于模型的参数属于高维空间，SGD训练的模型往往收敛到最优解的边界区域，如下图a中的模型![[公式]](https://www.zhihu.com/equation?tex=w_1), ![[公式]](https://www.zhihu.com/equation?tex=w_2)和![[公式]](https://www.zhihu.com/equation?tex=w_3)都落在边缘位置，但是**平均它们可以接近最优解**。那么SWA后面采用固定学习速率或者周期式学习速率来寻找更多的次优解，最后平均接近最优解。图b和c是说的是训练误差和测试误差往往不对齐，就是我们所说的模型泛化性能，那么平均的话其实是可以提升泛化性能的。
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/swa4.PNG)
+
+### 2.2 SWA应用在目标检测
+
+但是SWA该如何应用到目标检测呢？
+
+第一，SWA用什么学习率策略？使用高的固定的学习率还是周期性学习率？
+
+第二，应该平均多少个checkpoints?
+
+于是，作者开始做实验...
+
+从实验结果来看，采用固定学习速率最终的模型效果有所恶化，但是采用cos学习速率效果有提升，具体地采用cos lr为(0.02, 0.0002)，额外训练12个epoch就可以额外提升约一个点。另外这个策略也在Faster R-CNN，RetinaNet，FCOS，YOLOv3和VFNet实验，最终都可以大约提升AP一个点左右。所以最后的策略是：
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/swa6.PNG)
+
+其中cyclical learning rates 如下图：
+
+![](https://gitee.com/weifagan/MyPic/raw/master/img/swa1.PNG)
+
+## 3.指导意义？
+
+1.把SWA应用到目标检测上
